@@ -38,7 +38,6 @@ const itemsReverse = [...galeryReverse.children]
 const items = [...gallery.children];
 
 itemsReverse.forEach(item => {
-  console.log(item)
     let clone = item.cloneNode(true)
     galeryReverse.appendChild(clone)
   })
@@ -300,3 +299,4 @@ function createParticle() {
 
 // generate partikel tiap 300ms
 setInterval(createParticle, 300);
+
