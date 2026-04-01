@@ -1,494 +1,359 @@
 /**
- * K-ON! Portfolio - Main JavaScript
- * Structure: Utilities > Navigation > Animations > Music Player > Effects
+ * K-ON! Portfolio — Modern Edition
+ * Fixed: loading screen bug, added dark/light theme toggle
  */
 
 // ============================================
-// CONFIGURATION & DATA
+// CONFIG & DATA
 // ============================================
 
 const CONFIG = {
-  particles: {
-    interval: 300, // ms
-    colors: [
-      "rgba(124, 240, 61, 0.9)",
-      "rgba(65, 154, 255, 0.9)",
-      "rgba(140, 0, 210, 0.9)",
-      "rgba(255, 200, 0, 0.9)"
-    ]
-  },
-  gallery: {
-    animationDuration: "30s"
-  },
-  intersection: {
-    threshold: 0.2
-  }
+  particles: { interval: 350, colors: ['#a855f7','#60a5fa','#f472b6','#34d399','#fbbf24'] },
+  loadingDuration: 2600
 };
 
 const SONGS = [
-  {
-    name: "Tenshi ni Fureta yo!",
-    artist: "Hōkago Tea Time",
-    img: "album",
-    audio: "Tenshi-ni-fureta",
-    description: "A heartfelt ballad about cherished memories"
-  },
-  {
-    name: "Watashi no Koi wa Hotch Kiss",
-    artist: "Hōkago Tea Time",
-    img: "album-2",
-    audio: "watashi-no-koi",
-    description: "An energetic love song"
-  },
-  {
-    name: "Fuwa Fuwa Time",
-    artist: "Hōkago Tea Time",
-    img: "album-3",
-    audio: "fuwa-fuwa-time",
-    description: "The band's signature sweet song"
-  },
-  {
-    name: "Pure Pure Heart",
-    artist: "Hōkago Tea Time",
-    img: "album-4",
-    audio: "kon-pich-daisuki",
-    description: "An upbeat tune celebrating youth"
-  }
+  { name: "Tenshi ni Fureta yo!", artist: "Hōkago Tea Time", img: "album", audio: "Tenshi-ni-fureta" },
+  { name: "Watashi no Koi wa Hotch Kiss", artist: "Hōkago Tea Time", img: "album-2", audio: "watashi-no-koi" },
+  { name: "Fuwa Fuwa Time", artist: "Hōkago Tea Time", img: "album-3", audio: "fuwa-fuwa-time" },
+  { name: "Pure Pure Heart", artist: "Hōkago Tea Time", img: "album-4", audio: "kon-pich-daisuki" }
 ];
 
 // ============================================
-// DOM ELEMENTS
-// ============================================
-
-const DOM = {
-  // Navigation
-  nav: document.querySelector('.navbar'),
-  toggle: document.querySelector('.toggle'),
-  navLinks: document.querySelectorAll('.nav-link'),
-  
-  // Fade elements
-  faders: document.querySelectorAll('.fade'),
-  
-  // Gallery
-  gallery: document.querySelector('.memories-galery'),
-  galleryReverse: document.querySelector('.memories-galery-reverse'),
-  
-  // Albums
-  albumList: document.querySelector('.list-album'),
-  
-  // Music Player
-  musicContainer: document.querySelector('.music-container'),
-  musicPlayer: document.querySelector('.music-player'),
-  playImg: document.querySelector('.music-image img'),
-  musicName: document.querySelector('.music-titles .name'),
-  musicArtist: document.querySelector('.music-titles .artist'),
-  audio: document.querySelector('.main-songs'),
-  playBtn: document.querySelector('.play-pause'),
-  playBtnIcon: document.querySelector('.play-pause span'),
-  prevBtn: document.querySelector('#prev'),
-  nextBtn: document.querySelector('#next'),
-  progressBar: document.querySelector('.progress-bar span'),
-  progressDetails: document.querySelector('.progress-details'),
-  repeatBtn: document.querySelector('#repeat'),
-  closeModal: document.querySelector('.close-modal'),
-  
-  // Effects
-  bubble: document.querySelector('.light-bubble'),
-  particlesContainer: document.getElementById('particles')
-};
-
-// ============================================
-// UTILITY FUNCTIONS
+// UTILS
 // ============================================
 
 const utils = {
-  /**
-   * Format time in seconds to MM:SS
-   */
-  formatTime(seconds) {
-    if (isNaN(seconds)) return "0:00";
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  formatTime(s) {
+    if (isNaN(s)) return "0:00";
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}:${sec < 10 ? '0' : ''}${sec}`;
   },
-  
-  /**
-   * Debounce function for performance
-   */
-  debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-      const later = () => {
-        clearTimeout(timeout);
-        func(...args);
-      };
-      clearTimeout(timeout);
-      timeout = setTimeout(later, wait);
-    };
+  debounce(fn, ms) {
+    let t;
+    return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
   },
-  
-  /**
-   * Random number generator
-   */
-  random(min, max) {
-    return Math.random() * (max - min) + min;
+  rand(min, max) { return Math.random() * (max - min) + min; },
+  randEl(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+};
+
+// ============================================
+// THEME MODULE
+// ============================================
+
+const Theme = {
+  current: 'dark',
+
+  init() {
+    // Load saved preference
+    const saved = localStorage.getItem('kon-theme') || 'dark';
+    this.apply(saved);
+
+    const btn = document.getElementById('themeToggle');
+    btn?.addEventListener('click', () => this.toggle());
   },
-  
-  /**
-   * Random array element
-   */
-  randomElement(array) {
-    return array[Math.floor(Math.random() * array.length)];
+
+  toggle() {
+    this.apply(this.current === 'dark' ? 'light' : 'dark');
+  },
+
+  apply(theme) {
+    this.current = theme;
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('kon-theme', theme);
+
+    const icon = document.getElementById('themeIcon');
+    if (icon) icon.textContent = theme === 'dark' ? '🌙' : '☀️';
   }
 };
 
 // ============================================
-// NAVIGATION MODULE
+// LOADING SCREEN — FIXED
+// ============================================
+
+const LoadingScreen = {
+  init() {
+    const screen = document.getElementById('loadingScreen');
+    const bars = document.getElementById('barsAnimation');
+    const navbar = document.getElementById('navbar');
+    const homeInfo = document.getElementById('homeInfo');
+    const homeImg = document.getElementById('homeImg');
+
+    const reveal = () => {
+      // 1. Hide loading screen with fade
+      if (screen) screen.classList.add('hidden');
+
+      // 2. Hide bars with fade
+      if (bars) bars.classList.add('done');
+
+      // 3. Show navbar
+      if (navbar) navbar.classList.remove('hidden-init');
+
+      // 4. Animate hero content in (slight delay for polish)
+      setTimeout(() => {
+        if (homeInfo) homeInfo.classList.add('visible');
+        if (homeImg) homeImg.classList.add('visible');
+      }, 150);
+    };
+
+    // Trigger after animation + small buffer
+    if (document.readyState === 'complete') {
+      setTimeout(reveal, CONFIG.loadingDuration);
+    } else {
+      window.addEventListener('load', () => {
+        setTimeout(reveal, CONFIG.loadingDuration);
+      });
+    }
+  }
+};
+
+// ============================================
+// NAVIGATION
 // ============================================
 
 const Navigation = {
   init() {
     this.setupToggle();
     this.setupScroll();
-    this.setupSmoothScroll();
+    this.setupActiveLinks();
   },
-  
+
   setupToggle() {
-    DOM.toggle?.addEventListener('click', () => {
-      DOM.toggle.classList.toggle('active');
-      DOM.nav.classList.toggle('show');
+    const toggle = document.querySelector('.toggle');
+    const nav = document.getElementById('navbar');
+    const navLinks = document.querySelectorAll('.nav-link');
+
+    toggle?.addEventListener('click', () => {
+      toggle.classList.toggle('active');
+      nav.classList.toggle('show');
     });
-    
-    // Close menu when clicking nav link
-    DOM.navLinks.forEach(link => {
+
+    navLinks.forEach(link => {
       link.addEventListener('click', () => {
-        DOM.toggle?.classList.remove('active');
-        DOM.nav.classList.remove('show');
+        toggle?.classList.remove('active');
+        nav?.classList.remove('show');
       });
     });
   },
-  
+
   setupScroll() {
-    let lastScroll = 0;
-    const handleScroll = utils.debounce(() => {
-      const scrollY = window.scrollY;
-      
-      if (scrollY > 80) {
-        DOM.nav.classList.add('scrolling');
-      } else {
-        DOM.nav.classList.remove('scrolling');
-      }
-      
-      lastScroll = scrollY;
+    const nav = document.getElementById('navbar');
+    const scrollTopBtn = document.getElementById('scrollTop');
+
+    const onScroll = utils.debounce(() => {
+      const y = window.scrollY;
+      nav?.classList.toggle('scrolling', y > 70);
+      scrollTopBtn?.classList.toggle('visible', y > 400);
     }, 10);
-    
-    window.addEventListener('scroll', handleScroll);
+
+    window.addEventListener('scroll', onScroll);
+
+    scrollTopBtn?.addEventListener('click', () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
   },
-  
-  setupSmoothScroll() {
-    // Active link on scroll
+
+  setupActiveLinks() {
     const sections = document.querySelectorAll('section[id]');
-    
-    const highlightNav = () => {
-      const scrollY = window.scrollY;
-      
-      sections.forEach(section => {
-        const sectionHeight = section.offsetHeight;
-        const sectionTop = section.offsetTop - 100;
-        const sectionId = section.getAttribute('id');
-        const navLink = document.querySelector(`.nav-link[href="#${sectionId}"]`);
-        
-        if (scrollY > sectionTop && scrollY <= sectionTop + sectionHeight) {
-          navLink?.classList.add('active');
-        } else {
-          navLink?.classList.remove('active');
-        }
+    const onScroll = utils.debounce(() => {
+      const y = window.scrollY;
+      sections.forEach(sec => {
+        const top = sec.offsetTop - 120;
+        const bottom = top + sec.offsetHeight;
+        const link = document.querySelector(`.nav-link[href="#${sec.id}"]`);
+        link?.classList.toggle('active', y >= top && y < bottom);
       });
-    };
-    
-    window.addEventListener('scroll', utils.debounce(highlightNav, 10));
+    }, 10);
+    window.addEventListener('scroll', onScroll);
   }
 };
 
 // ============================================
-// ANIMATION MODULE
+// ANIMATIONS — FADE IN
 // ============================================
 
 const Animations = {
   init() {
-    this.setupFadeInObserver();
-  },
-  
-  setupFadeInObserver() {
     const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('show');
-        } else {
-          // Optional: remove class when scrolling away
-          // entry.target.classList.remove('show');
-        }
+      entries.forEach(e => {
+        if (e.isIntersecting) e.target.classList.add('show');
       });
-    }, {
-      threshold: CONFIG.intersection.threshold,
-      rootMargin: '0px 0px -50px 0px'
-    });
-    
-    DOM.faders.forEach(fade => observer.observe(fade));
+    }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.fade').forEach(el => observer.observe(el));
   }
 };
 
 // ============================================
-// GALLERY MODULE
+// GALLERY — seamless scroll duplication
 // ============================================
 
 const Gallery = {
   init() {
-    this.duplicateItems();
-  },
-  
-  duplicateItems() {
-    // Duplicate for seamless loop
-    if (DOM.gallery) {
-      const items = [...DOM.gallery.children];
-      items.forEach(item => {
-        const clone = item.cloneNode(true);
-        DOM.gallery.appendChild(clone);
-      });
-    }
-    
-    if (DOM.galleryReverse) {
-      const itemsReverse = [...DOM.galleryReverse.children];
-      itemsReverse.forEach(item => {
-        const clone = item.cloneNode(true);
-        DOM.galleryReverse.appendChild(clone);
-      });
-    }
+    ['.memories-galery', '.memories-galery-reverse'].forEach(sel => {
+      const el = document.querySelector(sel);
+      if (!el) return;
+      const items = [...el.children];
+      items.forEach(item => el.appendChild(item.cloneNode(true)));
+    });
   }
 };
 
 // ============================================
-// MUSIC PLAYER MODULE
+// MUSIC PLAYER
 // ============================================
 
 const MusicPlayer = {
-  currentIndex: 0,
-  
+  idx: 0,
+  isPlaying: false,
+
+  get audio() { return document.getElementById('mainAudio'); },
+  get container() { return document.getElementById('musicContainer'); },
+  get player() { return document.getElementById('musicPlayer'); },
+
   init() {
-    this.setupEventListeners();
-    this.loadSong(0);
+    this.bindEvents();
+    this.loadSong(0, false);
   },
-  
-  setupEventListeners() {
-    // Play/Pause
-    DOM.playBtn?.addEventListener('click', () => this.togglePlay());
-    
-    // Navigation
-    DOM.nextBtn?.addEventListener('click', () => this.nextSong());
-    DOM.prevBtn?.addEventListener('click', () => this.prevSong());
-    
-    // Repeat
-    DOM.repeatBtn?.addEventListener('click', () => this.repeatSong());
-    
-    // Progress
-    DOM.audio?.addEventListener('timeupdate', () => this.updateProgress());
-    DOM.audio?.addEventListener('loadeddata', () => this.updateDuration());
-    DOM.progressDetails?.addEventListener('click', (e) => this.seekTo(e));
-    
-    // Album clicks
-    this.setupAlbumClicks();
-    
-    // Close modal
-    DOM.closeModal?.addEventListener('click', () => this.closePlayer());
-  },
-  
-  loadSong(index) {
-    if (!SONGS[index]) return;
-    
-    const song = SONGS[index];
-    this.currentIndex = index;
-    
-    DOM.musicName.textContent = song.name;
-    DOM.musicArtist.textContent = song.artist;
-    DOM.playImg.src = `/images/${song.img}.jpeg`;
-    DOM.audio.src = `/songs/${song.audio}.mp3`;
-  },
-  
-  togglePlay() {
-    const isPaused = !DOM.musicPlayer.classList.contains('paused');
-    
-    if (isPaused) {
-      this.play();
-    } else {
-      this.pause();
-    }
-  },
-  
-  play() {
-    DOM.musicPlayer.classList.add('paused');
-    DOM.playBtnIcon.textContent = 'pause';
-    DOM.audio.play();
-  },
-  
-  pause() {
-    DOM.musicPlayer.classList.remove('paused');
-    DOM.playBtnIcon.textContent = 'play_arrow';
-    DOM.audio.pause();
-  },
-  
-  nextSong() {
-    this.currentIndex++;
-    if (this.currentIndex >= SONGS.length) {
-      this.currentIndex = 0;
-    }
-    this.loadSong(this.currentIndex);
-    this.play();
-  },
-  
-  prevSong() {
-    this.currentIndex--;
-    if (this.currentIndex < 0) {
-      this.currentIndex = SONGS.length - 1;
-    }
-    this.loadSong(this.currentIndex);
-    this.play();
-  },
-  
-  repeatSong() {
-    DOM.audio.currentTime = 0;
-    this.play();
-  },
-  
-  updateProgress() {
-    const currentTime = DOM.audio.currentTime;
-    const duration = DOM.audio.duration;
-    
-    if (!isNaN(duration)) {
-      const progressPercent = (currentTime / duration) * 100;
-      DOM.progressBar.style.width = `${progressPercent}%`;
-      
-      // Update current time display
-      const currentTimeDisplay = document.querySelector('.time .current');
-      if (currentTimeDisplay) {
-        currentTimeDisplay.textContent = utils.formatTime(currentTime);
-      }
-    }
-  },
-  
-  updateDuration() {
-    const duration = DOM.audio.duration;
-    const finalTimeDisplay = document.querySelector('.time .final');
-    
-    if (finalTimeDisplay && !isNaN(duration)) {
-      finalTimeDisplay.textContent = utils.formatTime(duration);
-    }
-  },
-  
-  seekTo(e) {
-    const progressWidth = DOM.progressDetails.clientWidth;
-    const clickX = e.offsetX;
-    const duration = DOM.audio.duration;
-    
-    if (!isNaN(duration)) {
-      DOM.audio.currentTime = (clickX / progressWidth) * duration;
-    }
-  },
-  
-  setupAlbumClicks() {
-    DOM.albumList?.addEventListener('click', (e) => {
-      const albumImg = e.target.closest('.album-body img');
-      if (!albumImg) return;
-      
-      // Find which album was clicked
-      const albumClasses = ['album-1', 'album-2', 'album-3', 'album-4'];
-      const clickedIndex = albumClasses.findIndex(cls => albumImg.classList.contains(cls));
-      
-      if (clickedIndex !== -1) {
-        this.openPlayer(clickedIndex);
-      }
+
+  bindEvents() {
+    document.getElementById('playPause')?.addEventListener('click', () => this.togglePlay());
+    document.getElementById('next')?.addEventListener('click', () => this.next());
+    document.getElementById('prev')?.addEventListener('click', () => this.prev());
+    document.getElementById('repeat')?.addEventListener('click', () => { this.audio.currentTime = 0; if (this.isPlaying) this.audio.play(); });
+    document.getElementById('closeModal')?.addEventListener('click', () => this.close());
+
+    this.audio?.addEventListener('timeupdate', () => this.updateProgress());
+    this.audio?.addEventListener('loadedmetadata', () => this.updateDuration());
+    this.audio?.addEventListener('ended', () => this.next());
+
+    document.getElementById('progressDetails')?.addEventListener('click', e => {
+      const bar = e.currentTarget;
+      const pct = e.offsetX / bar.clientWidth;
+      if (!isNaN(this.audio.duration)) this.audio.currentTime = pct * this.audio.duration;
+    });
+
+    // Album click
+    document.querySelector('.list-album')?.addEventListener('click', e => {
+      const img = e.target.closest('.album-body img');
+      if (!img) return;
+      const cls = ['album-1','album-2','album-3','album-4'];
+      const i = cls.findIndex(c => img.classList.contains(c));
+      if (i !== -1) this.open(i);
     });
   },
-  
-  openPlayer(songIndex) {
-    this.loadSong(songIndex);
-    DOM.musicContainer.classList.add('show');
-    this.play();
+
+  loadSong(i, autoPlay = false) {
+    const song = SONGS[i];
+    if (!song) return;
+    this.idx = i;
+
+    const nameEl = document.getElementById('musicName');
+    const artistEl = document.getElementById('musicArtist');
+    const imgEl = document.getElementById('playImg');
+
+    if (nameEl) nameEl.textContent = song.name;
+    if (artistEl) artistEl.textContent = song.artist;
+    if (imgEl) imgEl.src = `/images/${song.img}.jpeg`;
+    if (this.audio) this.audio.src = `/songs/${song.audio}.mp3`;
+
+    if (autoPlay) this.play();
   },
-  
-  closePlayer() {
+
+  play() {
+    this.isPlaying = true;
+    this.player?.classList.add('paused');
+    const icon = document.getElementById('playIcon');
+    if (icon) icon.textContent = 'pause';
+    this.audio?.play().catch(() => {});
+  },
+
+  pause() {
+    this.isPlaying = false;
+    this.player?.classList.remove('paused');
+    const icon = document.getElementById('playIcon');
+    if (icon) icon.textContent = 'play_arrow';
+    this.audio?.pause();
+  },
+
+  togglePlay() { this.isPlaying ? this.pause() : this.play(); },
+
+  next() {
+    this.loadSong((this.idx + 1) % SONGS.length, true);
+  },
+
+  prev() {
+    this.loadSong((this.idx - 1 + SONGS.length) % SONGS.length, true);
+  },
+
+  open(i) {
+    this.loadSong(i, true);
+    this.container?.classList.add('show');
+  },
+
+  close() {
     this.pause();
-    DOM.musicContainer.classList.remove('show');
+    this.container?.classList.remove('show');
+  },
+
+  updateProgress() {
+    const cur = this.audio?.currentTime;
+    const dur = this.audio?.duration;
+    if (isNaN(dur)) return;
+
+    const pct = (cur / dur) * 100;
+    const bar = document.getElementById('progressBar');
+    if (bar) bar.style.width = `${pct}%`;
+
+    const curEl = document.getElementById('currentTime');
+    if (curEl) curEl.textContent = utils.formatTime(cur);
+  },
+
+  updateDuration() {
+    const durEl = document.getElementById('finalTime');
+    if (durEl && !isNaN(this.audio.duration)) {
+      durEl.textContent = utils.formatTime(this.audio.duration);
+    }
   }
 };
 
 // ============================================
-// EFFECTS MODULE
+// EFFECTS
 // ============================================
 
 const Effects = {
   init() {
-    this.setupBubble();
-    this.startParticles();
+    this.bubble();
+    this.particles();
   },
-  
-  setupBubble() {
-    document.addEventListener('mousemove', utils.debounce((e) => {
-      const x = e.clientX;
-      const y = e.clientY;
-      DOM.bubble.style.backgroundPosition = `${x - 100}px ${y - 100}px`;
-    }, 10));
-  },
-  
-  startParticles() {
-    setInterval(() => this.createParticle(), CONFIG.particles.interval);
-  },
-  
-  createParticle() {
-    if (!DOM.particlesContainer) return;
-    
-    const particle = document.createElement('div');
-    particle.classList.add('particle');
-    
-    // Random position
-    particle.style.left = `${utils.random(0, 100)}vw`;
-    particle.style.bottom = '-10px';
-    
-    // Random size
-    const size = utils.random(4, 10);
-    particle.style.width = `${size}px`;
-    particle.style.height = `${size}px`;
-    
-    // Random duration
-    const duration = utils.random(5, 10);
-    particle.style.animationDuration = `${duration}s`;
-    
-    // Random color
-    const color = utils.randomElement(CONFIG.particles.colors);
-    particle.style.background = `radial-gradient(circle, ${color}, transparent)`;
-    
-    DOM.particlesContainer.appendChild(particle);
-    
-    // Remove after animation
-    setTimeout(() => {
-      particle.remove();
-    }, duration * 1000);
-  }
-};
 
-// ============================================
-// LOADING SCREEN
-// ============================================
+  bubble() {
+    const b = document.getElementById('lightBubble');
+    if (!b) return;
+    document.addEventListener('mousemove', utils.debounce(e => {
+      b.style.backgroundPosition = `${e.clientX - 140}px ${e.clientY - 140}px`;
+    }, 12));
+  },
 
-const LoadingScreen = {
-  init() {
-    window.addEventListener('load', () => {
-      setTimeout(() => {
-        const loadingScreen = document.querySelector('.loading-screen');
-        if (loadingScreen) {
-          loadingScreen.style.display = 'none';
-        }
-      }, 2500);
-    });
+  particles() {
+    const container = document.getElementById('particles');
+    if (!container) return;
+
+    setInterval(() => {
+      const p = document.createElement('div');
+      p.classList.add('particle');
+      p.style.cssText = `
+        left: ${utils.rand(0, 100)}vw;
+        bottom: -10px;
+        width: ${utils.rand(3, 8)}px;
+        height: ${utils.rand(3, 8)}px;
+        background: radial-gradient(circle, ${utils.randEl(CONFIG.particles.colors)}, transparent);
+        animation-duration: ${utils.rand(6, 11)}s;
+      `;
+      container.appendChild(p);
+      setTimeout(() => p.remove(), 11000);
+    }, CONFIG.particles.interval);
   }
 };
 
@@ -496,219 +361,84 @@ const LoadingScreen = {
 // KEYBOARD SHORTCUTS
 // ============================================
 
-const KeyboardShortcuts = {
+const Keys = {
   init() {
-    document.addEventListener('keydown', (e) => {
-      // Only if music player is open
-      if (!DOM.musicContainer.classList.contains('show')) return;
-      
-      switch(e.key) {
-        case ' ': // Space - play/pause
-          e.preventDefault();
-          MusicPlayer.togglePlay();
-          break;
-        case 'ArrowRight': // Next song
-          e.preventDefault();
-          MusicPlayer.nextSong();
-          break;
-        case 'ArrowLeft': // Previous song
-          e.preventDefault();
-          MusicPlayer.prevSong();
-          break;
-        case 'Escape': // Close player
-          MusicPlayer.closePlayer();
-          break;
+    document.addEventListener('keydown', e => {
+      const open = document.getElementById('musicContainer')?.classList.contains('show');
+      if (!open) return;
+      switch (e.key) {
+        case ' ': e.preventDefault(); MusicPlayer.togglePlay(); break;
+        case 'ArrowRight': e.preventDefault(); MusicPlayer.next(); break;
+        case 'ArrowLeft': e.preventDefault(); MusicPlayer.prev(); break;
+        case 'Escape': MusicPlayer.close(); break;
       }
     });
   }
 };
 
 // ============================================
-// CONTACT FORM (Optional Enhancement)
+// CONTACT FORM
 // ============================================
 
 const ContactForm = {
   init() {
-    const form = document.querySelector('.contact-form');
-    const button = form?.querySelector('button');
-    
-    button?.addEventListener('click', (e) => {
-      e.preventDefault();
-      this.handleSubmit(form);
-    });
-  },
-  
-  handleSubmit(form) {
-    const inputs = form.querySelectorAll('input, textarea');
-    let isValid = true;
-    
-    inputs.forEach(input => {
-      if (!input.value.trim()) {
-        isValid = false;
-        input.style.borderColor = 'red';
-        setTimeout(() => {
-          input.style.borderColor = '';
-        }, 2000);
+    document.getElementById('sendBtn')?.addEventListener('click', () => {
+      const name = document.getElementById('contactName')?.value.trim();
+      const email = document.getElementById('contactEmail')?.value.trim();
+      const msg = document.getElementById('contactMessage')?.value.trim();
+
+      if (!name || !email || !msg) {
+        alert('Please fill in all fields!');
+        return;
       }
-    });
-    
-    if (isValid) {
-      // Here you would normally send the data to a server
-      alert('Thank you for your message! We\'ll get back to you soon. 🎵');
-      form.reset();
-    } else {
-      alert('Please fill in all fields!');
-    }
-  }
-};
 
-// ============================================
-// PERFORMANCE OPTIMIZATION
-// ============================================
-
-const Performance = {
-  init() {
-    // Lazy load images
-    this.lazyLoadImages();
-    
-    // Preload critical assets
-    this.preloadAssets();
-  },
-  
-  lazyLoadImages() {
-    const images = document.querySelectorAll('img[data-src]');
-    
-    const imageObserver = new IntersectionObserver((entries, observer) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          const img = entry.target;
-          img.src = img.dataset.src;
-          img.removeAttribute('data-src');
-          observer.unobserve(img);
-        }
-      });
-    });
-    
-    images.forEach(img => imageObserver.observe(img));
-  },
-  
-  preloadAssets() {
-    // Preload first song
-    if (SONGS[0]) {
-      const audio = new Audio();
-      audio.src = `/songs/${SONGS[0].audio}.mp3`;
-      audio.preload = 'metadata';
-    }
-  }
-};
-
-// ============================================
-// ACCESSIBILITY ENHANCEMENTS
-// ============================================
-
-const Accessibility = {
-  init() {
-    // Skip to content link
-    this.addSkipLink();
-    
-    // Focus management
-    this.manageFocus();
-  },
-  
-  addSkipLink() {
-    const skipLink = document.createElement('a');
-    skipLink.href = '#home';
-    skipLink.className = 'skip-link';
-    skipLink.textContent = 'Skip to main content';
-    skipLink.style.cssText = `
-      position: absolute;
-      top: -40px;
-      left: 0;
-      background: var(--clr-primary);
-      color: white;
-      padding: 8px;
-      z-index: 10000;
-    `;
-    
-    skipLink.addEventListener('focus', () => {
-      skipLink.style.top = '0';
-    });
-    
-    skipLink.addEventListener('blur', () => {
-      skipLink.style.top = '-40px';
-    });
-    
-    document.body.insertBefore(skipLink, document.body.firstChild);
-  },
-  
-  manageFocus() {
-    // Trap focus in modal when open
-    const modal = DOM.musicContainer;
-    
-    modal?.addEventListener('keydown', (e) => {
-      if (!modal.classList.contains('show')) return;
-      
-      if (e.key === 'Tab') {
-        const focusableElements = modal.querySelectorAll(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        );
-        
-        const firstElement = focusableElements[0];
-        const lastElement = focusableElements[focusableElements.length - 1];
-        
-        if (e.shiftKey && document.activeElement === firstElement) {
-          e.preventDefault();
-          lastElement.focus();
-        } else if (!e.shiftKey && document.activeElement === lastElement) {
-          e.preventDefault();
-          firstElement.focus();
-        }
-      }
+      alert(`Thank you, ${name}! Your message has been received. We'll get back to you soon. 🎵`);
+      document.getElementById('contactName').value = '';
+      document.getElementById('contactEmail').value = '';
+      document.getElementById('contactMessage').value = '';
     });
   }
 };
 
 // ============================================
-// INITIALIZATION
+// ACCESSIBILITY — skip link
 // ============================================
 
-class App {
-  constructor() {
-    this.init();
-  }
-  
+const A11y = {
   init() {
-    // Wait for DOM to be ready
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => this.start());
-    } else {
-      this.start();
-    }
+    const skip = document.createElement('a');
+    skip.href = '#home';
+    skip.textContent = 'Skip to main content';
+    skip.style.cssText = 'position:absolute;top:-40px;left:0;background:#a855f7;color:#fff;padding:8px 14px;z-index:10000;border-radius:0 0 6px 6px;font-size:14px;transition:top 0.2s';
+    skip.addEventListener('focus', () => skip.style.top = '0');
+    skip.addEventListener('blur', () => skip.style.top = '-40px');
+    document.body.insertBefore(skip, document.body.firstChild);
   }
-  
-  start() {
-    console.log('🎵 K-ON! Portfolio Initialized');
-    
-    // Initialize all modules
-    LoadingScreen.init();
-    Navigation.init();
-    Animations.init();
-    Gallery.init();
-    MusicPlayer.init();
-    Effects.init();
-    KeyboardShortcuts.init();
-    ContactForm.init();
-    Performance.init();
-    Accessibility.init();
-    
-    console.log('✨ All modules loaded successfully!');
-  }
+};
+
+// ============================================
+// INIT
+// ============================================
+
+function start() {
+  console.log('🎵 K-ON! Portfolio — Elegant Edition');
+
+  Theme.init();
+  LoadingScreen.init();
+  Navigation.init();
+  Animations.init();
+  Gallery.init();
+  MusicPlayer.init();
+  Effects.init();
+  Keys.init();
+  ContactForm.init();
+  A11y.init();
+
+  console.log('✨ All modules ready!');
 }
 
-// Start the application
-const app = new App();
-
-// Export for potential future use
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { App, MusicPlayer, Navigation, Animations };
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', start);
+} else {
+  start();
 }
